@@ -1,0 +1,9 @@
+numpy==1.26.4
+pandas
+matplotlib
+scikit-learn
+tensorflow
+keras
+protobuf==3.20.3
+openpyxl
+plotly
