@@ -98,30 +98,38 @@ def predict_future(model, rawdataset, years, sembako_type, seq_length=60):
     
     return future_df
 
-st.title("Grocery Price Prediction")
-st.write("Predicting average grocery prices using LSTM, GRU, and SVR models")
+# Initialize session state for prediction results
+if 'prediction_results' not in st.session_state:
+    st.session_state['prediction_results'] = []
 
-uploaded_file = st.file_uploader("Upload your Excel file", type="xlsx")
-if uploaded_file is not None:
-    dataset = pd.read_excel(uploaded_file, index_col=None)
-    
-    st.write("Dataset:")
-    st.write(dataset)
-    
+st.sidebar.title("Grocery Price Prediction")
+st.sidebar.write("Predicting average grocery prices using LSTM, GRU, and SVR models")
+
+dataset_source = st.sidebar.selectbox("Select Dataset Source", ["Upload your own dataset", "Use dataset from repository"])
+
+if dataset_source == "Upload your own dataset":
+    uploaded_file = st.sidebar.file_uploader("Upload your Excel file", type="xlsx")
+    if uploaded_file is not None:
+        dataset = pd.read_excel(uploaded_file, index_col=None)
+else:
+    dataset_file_path = 'grocery_price.xlsx'  # Modify the path according to your repository location
+    dataset = pd.read_excel(dataset_file_path, index_col=None)
+
+if dataset is not None:
     st.write("Dataset Preprocessing:")
     preprocessed = preprocess_data(dataset)
     st.write(preprocessed)
     
-    sembako_type = st.selectbox("Select commodity type", preprocessed.columns)
+    sembako_type = st.sidebar.selectbox("Select commodity type", preprocessed.columns)
     
     st.write("Dataset Visualization:")
     plottest = plotly_test(preprocessed, sembako_type)
     st.plotly_chart(plottest)
     
-    selection = st.selectbox("Select Model", ["LSTM", "GRU", "SVR"])
-    years = st.number_input("Predict how many years into the future?", min_value=1, max_value=10, value=1)
+    selection = st.sidebar.selectbox("Select Model", ["LSTM", "GRU", "SVR"])
+    years = st.sidebar.number_input("Predict how many years into the future?", min_value=1, max_value=10, value=1)
     
-    if st.button("Start Prediction"):
+    if st.sidebar.button("Start Prediction"):
         if selection == "LSTM":
             with open('LSTM.pkl', 'rb') as f:
                 model = pickle.load(f)
@@ -143,3 +151,18 @@ if uploaded_file is not None:
         
         future_fig = px.line(future_df, x='Date', y='Predicted', title='Future Grocery Price Prediction')
         st.plotly_chart(future_fig)
+
+        # Store prediction results
+        st.session_state['prediction_results'].append({
+            'Model': selection,
+            'Commodity': sembako_type,
+            'Years Ahead': years,
+            'Predicted Price': future_df['Predicted'].values[-1],
+            'MSE': mse,
+            'R2': r2
+        })
+
+    if st.session_state['prediction_results']:
+        results_df = pd.DataFrame(st.session_state['prediction_results'])
+        st.write("Comparison of Predictions:")
+        st.table(results_df)
