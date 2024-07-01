@@ -107,6 +107,7 @@ st.sidebar.write("Predicting average grocery prices using LSTM, GRU, and SVR mod
 
 dataset_source = st.sidebar.selectbox("Select Dataset Source", ["Upload your own dataset", "Use dataset from repository"])
 
+dataset = None
 if dataset_source == "Upload your own dataset":
     uploaded_file = st.sidebar.file_uploader("Upload your Excel file", type="xlsx")
     if uploaded_file is not None:
@@ -166,3 +167,5 @@ if dataset is not None:
         results_df = pd.DataFrame(st.session_state['prediction_results'])
         st.write("Comparison of Predictions:")
         st.table(results_df)
+else:
+    st.warning("No dataset has been selected or uploaded. You can visit https://panelharga.badanpangan.go.id/ to download your own dataset. Please select or upload a dataset to proceed.")
