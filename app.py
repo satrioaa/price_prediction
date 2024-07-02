@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error, r2_score
-from keras.models import Sequential, load_model
+from keras.models import Sequential
 from keras.layers import Dense, Dropout, LSTM, GRU, Bidirectional
 import pickle
 import openpyxl
@@ -42,7 +42,6 @@ def process_model(model, selection, rawdataset, sembako_type):
     scaled_dataset = sc.fit_transform(sembako_data)
     
     x_test, y_test = create_sequences(scaled_dataset)
-    x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))
     
     if selection == "SVR":
         x_pred = x_test.reshape(x_test.shape[0], x_test.shape[1])
@@ -50,12 +49,13 @@ def process_model(model, selection, rawdataset, sembako_type):
         predicted_price = sc.inverse_transform(predicted_price.reshape(-1, 1))
         
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=original['Date'], y=sembako_data.flatten(), mode='lines', name='Grocery Price', line=dict(color='red')))
-        fig.add_trace(go.Scatter(x=original['Date'], y=predicted_price.flatten(), mode='lines', name='Predicted Grocery Price', line=dict(color='green')))
+        fig.add_trace(go.Scatter(x=original['Date'][60:], y=sembako_data[60:].flatten(), mode='lines', name='Grocery Price', line=dict(color='red')))
+        fig.add_trace(go.Scatter(x=original['Date'][60:], y=predicted_price.flatten(), mode='lines', name='Predicted Grocery Price', line=dict(color='green')))
         
         mse = mean_squared_error(sembako_data[60:], predicted_price)
         r2 = r2_score(sembako_data[60:], predicted_price)
     else:
+        x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))
         predicted_price = model.predict(x_test)
         predicted_price = sc.inverse_transform(predicted_price)
         predicted_price = np.round(predicted_price, 2)
@@ -85,8 +85,14 @@ def predict_future(model, rawdataset, years, sembako_type, seq_length=60):
     predictions = []
     
     for _ in range(years * 12):
-        x_test = np.reshape(last_sequence, (1, last_sequence.shape[0], 1))
+        if model.__class__.__name__ == 'SVR':
+            x_test = np.reshape(last_sequence, (1, -1))
+        else:
+            x_test = np.reshape(last_sequence, (1, last_sequence.shape[0], 1))
+            
         predicted_price = model.predict(x_test)
+        if model.__class__.__name__ == 'SVR':
+            predicted_price = predicted_price.reshape(-1, 1)
         predicted_price = sc.inverse_transform(predicted_price)
         predictions.append(predicted_price[0, 0])
         last_sequence = np.append(last_sequence[1:], sc.transform(predicted_price.reshape(-1, 1)), axis=0)
@@ -131,15 +137,8 @@ if dataset is not None:
     years = st.sidebar.number_input("Predict how many years into the future?", min_value=1, max_value=10, value=1)
     
     if st.sidebar.button("Start Prediction"):
-        if selection == "LSTM":
-            with open('LSTM.pkl', 'rb') as f:
-                model = pickle.load(f)
-        elif selection == "GRU":
-            with open('GRU.pkl', 'rb') as f:
-                model = pickle.load(f)
-        elif selection == "SVR":
-            with open('SVR.pkl', 'rb') as f:
-                model = pickle.load(f)
+        with open(f'{selection}.pkl', 'rb') as f:
+            model = pickle.load(f)
         
         result, mse, r2 = process_model(model, selection, dataset, sembako_type)
         st.plotly_chart(result)
@@ -168,4 +167,4 @@ if dataset is not None:
         st.write("Comparison of Predictions:")
         st.table(results_df)
 else:
-    st.warning("No dataset has been selected or uploaded. You can visit https://panelharga.badanpangan.go.id/ to download your own dataset. Please select or upload a dataset to proceed.")
+    st.warning("No dataset has been selected or uploaded. You can visit https://panelharga.badanpangan.go.id/ to download your own dataset or use dataset from the repository.")
